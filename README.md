@@ -1,3 +1,6 @@
+## Prueba
+    - Ejecutar xmltravel.py
+    
 ## Problema inicial
 
 - Tenemos un csv con las siguientes columnas
@@ -27,12 +30,14 @@ start_time,encryp_client,encryp_supplier,environment,hub_machine,hub_status_id,e
 
 ## Trabajo realizado
 
-- Se ha creado ["Jupiter Notebook"](https://alertsxanomalydetection-operezfuentes.notebooks.azure.com/j/tree#notebooks) en Azure para ir haciendo pruebas rápidas
-- Se está barajando la opción de unsar `Python` con la librería `PyOD`. Ejemplos [aquí](https://www.analyticsvidhya.com/blog/2019/02/outlier-detection-python-pyod/)
-- Actualmente tenemos problemas en definir las diferentes dimensiones y como utilizar campos que no sean numéricos
+- Se ha creado un módulo generador de datasets configurable para hacer ETLs básicas sobre el dataset original.
+- Se ha creado un dataset con los siguientes datos: hour_in_day,error_code,Hits,encryp_client+encryp_supplier+environment
+- Se ha creado un módulo normalizador que codifica y decodifica los campos no numéricos
+- Se ha creado un módulo de detección de anomalías con KNN
+- Se ha creado un módulo de visualización de las predicciones para el dataset generaro.
 
 ## TODO
-
+    
 - __PARSEO:__ 
     - Realizar una función que recoja los datos del CSV y transformar el campo de fecha a varios campos con día, mes, año, hora. 
     - Normalizar datos.
