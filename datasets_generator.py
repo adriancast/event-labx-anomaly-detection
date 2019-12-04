@@ -3,55 +3,99 @@ import pandas as pd
 import os
 import datetime
 import base64
+import normalize
 from sklearn import preprocessing
-
-## Módulo para generar datasets de combinaciones de columnas del dataset original, para año, mes semana y día
-
-
-#coge los datos del dataset original
-dataset='full'
-df=pd.read_csv("./normalized_"+dataset+".csv")
-
-#Queremos combinaciones de las siguientes columnas del dataset original
-values = ['hour_in_day','encryp_client','encryp_supplier','environment','hub_machine','hub_status_id','error_code','Hits']
+import gc
 
 
-#Contadores para el combinador multivariable
-counters=[]
-n=len(values) 
-for counter in range(n):
-    counters.append(0)
+## Módulo para generar datasets 
 
-for iter in range(2**n):
-    current_columns_day_in_year=[]
-    current_columns_day_in_month=[]
-    current_columns_day_in_week=[]
 
-    current_columns_day_in_year.append('day_in_year')
-    current_columns_day_in_month.append('day_in_month')
-    current_columns_day_in_week.append('day_in_week')
 
-    #print("**************")
+def join_columns(s1,s2):
+    return s1+' '+s2
+
+def generate_dataframes(dataframe,datasets,fixedColumns, variableColumns,joinedcolumns,dropColumns):
+    
+    dataframe=dataframe.drop(columns=dropColumns)
+
+    gc.collect()
+
+    print(dataframe.head())
+
+    print("start joining")
+    for col in range(len(joinedcolumns)) :
+        if("joined" not in  dataframe.columns ):
+            dataframe["joined"]=dataframe.filter(items=[joinedcolumns[col]])
+            dataframe=dataframe.drop(columns=[joinedcolumns[col]])
+            gc.collect()
+        else:
+            dataframe["joined"]=dataframe["joined"].map(str) +' '+ dataframe[joinedcolumns[col]].map(str)
+            dataframe=dataframe.drop(columns=[joinedcolumns[col]])
+            gc.collect()
+    
+    joinedColumnsName="+".join(joinedcolumns)
+   
+    dataframe=dataframe.rename(columns={"joined":joinedColumnsName})
+    print(dataframe.head())
+    gc.collect()
+    
+    
+    
+    #Contadores para el combinador multivariable
+    counters=[]
+    n=len(variableColumns) 
     for counter in range(n):
-        if counters[counter]==0 :
-            current_columns_day_in_year.append(values[counter])
-            current_columns_day_in_month.append(values[counter])
-            current_columns_day_in_week.append(values[counter])
+        counters.append(0)
+        
+    datarange_count=0
+    #si no hay variaciones, almenos damos un resultado
+    if(2**n==0):
+        datarange_count=2**n
+    else: 
+        datarange_count=1
+
+    for iter in range(datarange_count) :
+        sets=[]
+
+        for l in range(len(datasets)) :
+            sets.append([datasets[l]]) #as list
+            print("creating dataset: "+datasets[l] )
+
+        
+
+        #add variable columns
+        for counter in range(n):
+            if counters[counter]==0 :
+                for l in range(len(datasets)):
+                    sets[l].append( variableColumns[counter])
+                
+        # add fixedColumns at the end 
+        for l in range(len(datasets)):
+            for c in range(len(fixedColumns)):
+                sets[l].append(fixedColumns[c])
+
+        # add joinedColumn at the end 
+        for l in range(len(datasets)):
+            sets[l].append(joinedColumnsName)
+
+        for l in range(len(datasets)) :
+            print("dataset "+datasets[l]+" configured: "+(' '.join(sets[l])) )
             
-    
-    #print(current_columns_day_in_year)
-    df.filter(items=current_columns_day_in_year).to_csv(dataset+'_'+'-'.join(current_columns_day_in_year)+'.csv')
-    df.filter(items=current_columns_day_in_month).to_csv(dataset+'_'+'-'.join(current_columns_day_in_month)+'.csv')
-    df.filter(items=current_columns_day_in_week).to_csv(dataset+'_'+'-'.join(current_columns_day_in_week)+'.csv')
+        for l in range(len(datasets)):
+            print("started creating dataset "+datasets[l])
+            dataset_filtered=dataframe.filter(items=sets[l])
+            dataset_filtered.to_csv( datasets[l]+'.'+'-'.join(sets[l])+'.dataframe.csv')
+            print("finished creating dataset "+datasets[l])
 
-    
+        #print(counters)
+        for i in range(n):
+            if( (counters[i]+1)%2!=0):
+                counters[i]=counters[i]+1
+                for j in range(i):
+                    counters[j]=0
+                break
 
-    #print(counters)
-    for i in range(n):
-        if( (counters[i]+1)%2!=0):
-            counters[i]=counters[i]+1
-            for j in range(i):
-                counters[j]=0
-            break
-
+def save_distincts(dataframe, filepath):
+    dataframe.drop_duplicates().to_csv( filepath)
 

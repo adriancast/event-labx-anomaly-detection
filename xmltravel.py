@@ -9,8 +9,13 @@
 from __future__ import division
 from __future__ import print_function
 
+import gc
 import os
 import sys
+from mpl_toolkits import mplot3d
+
+import numpy as np
+import matplotlib.pyplot as plt
 
 # temporary solution for relative imports in case pyod is not installed
 # if pyod is installed, no need to use the following line
@@ -22,67 +27,64 @@ from pyod.utils.data import generate_data
 from pyod.utils.data import evaluate_print
 from pyod.utils.example import visualize
 
-#df = pd.read_csv("/Users/germanmartinezlopez/Downloads/data.csv")
-#print(df.info())
-
+import json
 import numpy as np
 import pandas as pd
 import os
 import datetime
 import base64
 from sklearn import preprocessing
-def parse_day_in_year(start_time):
-	start_time = start_time.replace(" UTC", "")
-	return str(datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timetuple().tm_yday)
-def parse_day_in_month(start_time):
-	start_time = start_time.replace(" UTC", "")
-	return str(datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timetuple().tm_mday)
-def parse_hour_in_day(start_time):
-	start_time = start_time.replace(" UTC", "")
-	return str(datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').hour)
-def parse_day_in_week(start_time):
-	start_time = start_time.replace(" UTC", "")
-	return str(datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timetuple().tm_wday)
-def stro_to_int(inp):
-	return int.from_bytes(base64.b64encode(inp.encode()), 'big')
-df=pd.read_csv("./mini.csv")
-df['day_in_month'] = df['start_time'].apply(parse_day_in_month)
-df['day_in_year'] = df['start_time'].apply(parse_day_in_year)
-df['day_in_week'] = df['start_time'].apply(parse_day_in_week)
-df['hour_in_day'] = df['start_time'].apply(parse_hour_in_day)
-df['encryp_client'] = df['encryp_client'].apply(stro_to_int)
-df['encryp_supplier'] = df['encryp_supplier'].apply(stro_to_int)
-df['environment'] = df['environment'].apply(stro_to_int)
-df['hub_machine'] = df['hub_machine'].apply(stro_to_int)
-df = df.drop('start_time', axis=1)
-print(df.head())
 
+import pickle 
+import normalize
+import datasets_generator
+import trainer
+import plotter
+
+
+
+##############################################
+############### Main #########################
 if __name__ == "__main__":
-    contamination = 0.1  # percentage of outliers
-    n_train = 200  # number of training points
-    n_test = 100  # number of testing points
+    #coge los datos del dataset original
+    #transforma la start_date, y recupers sólo la hora del día del evento
+    #guarda el csv al fichero temp_data.csv para que si se vuelve a ejecutar, se ahorre tiempo
+    dataset_name='data'
+    if( not os.path.exists("./temp_"+dataset_name+".csv") ):
+        print("start loading file ./"+dataset_name+".csv")
+        df=pd.read_csv("./"+dataset_name+".csv")
+        df['hour_in_day'] = df['start_time'].apply(normalize.parse_hour_in_day)
+        df = df.drop('start_time', axis=1)
+        df.to_csv("./temp_"+dataset_name+".csv")
+        gc.collect()
+    else:
+        print("start loading file ./temp_"+dataset_name+".csv")
+        df=pd.read_csv("./temp_"+dataset_name+".csv")
+        df=df.drop(df.columns[0], axis=1)
+        print(df.head())
 
-    # train kNN detector
-    clf_name = 'KNN'
-    clf = KNN()
-    clf.fit(df)
+    print("finished loading file ./"+dataset_name+".csv")
 
-    # get the prediction labels and outlier scores of the training data
-    y_train_pred = clf.labels_  # binary labels (0: inliers, 1: outliers)
-    y_train_scores = clf.decision_scores_  # raw outlier scores
-	
-    import pdb; pdb.set_trace()
-   
-    # get the prediction on the test data
-    #y_test_pred = clf.predict(X_test)  # outlier labels (0 or 1)
-    #y_test_scores = clf.decision_function(X_test)  # outlier scores
+    #no tenemos datos suficientes para hacer esto - datasets=['day_in_year','day_in_month','day_in_week']
+    datasets=['hour_in_day']
+    # estas columnas las descartamos 
+    drop_values=['hub_machine','hub_status_id']
+    #ahora mismo no queremos generar datasets con combinaciones de columnas, sólo queremos un fichero de salida
+    variable_values=[]
+    #queremos juntarl estas variables independientes en otra independiente, para reducir la dimensión de los datos
+    joined_values=['encryp_client','encryp_supplier','environment']
+    #estos campo tienen que ir siempre ya que son las salidas a evaluar
+    fixed_values=['error_code','Hits']
+    #generamos el dataframe
+    if( not os.path.exists('./hour_in_day.hour_in_day-error_code-Hits-encryp_client+encryp_supplier+environment.dataframe.csv')):
+        datasets_generator.generate_dataframes(df,datasets,fixed_values,variable_values,joined_values, drop_values)
+    #entrenamos la KNN
+    df=pd.read_csv('./hour_in_day.hour_in_day-error_code-Hits-encryp_client+encryp_supplier+environment.dataframe.csv')
+    df=df.drop(df.columns[0], axis=1)
+    df.head(10000).to_csv('./hour_in_day.hour_in_day-error_code-Hits-encryp_client+encryp_supplier+environment.dataframe.training.csv')
+    df.tail(10).to_csv('./hour_in_day.hour_in_day-error_code-Hits-encryp_client+encryp_supplier+environment.dataframe.verifying.csv')
+    df_train,results=trainer.train('./hour_in_day.hour_in_day-error_code-Hits-encryp_client+encryp_supplier+environment.dataframe.verifying.csv')
+    #mostramos los resultados
+    plotter.show(df_train,results)
 
-    # evaluate and print the results
-    #print("\nOn Training Data:")
-    #evaluate_print(clf_name, y_train, y_train_scores)
-    #print("\nOn Test Data:")
-    #evaluate_print(clf_name, y_test, y_test_scores)
 
-    # visualize the results
-    #visualize(clf_name, X_train, y_train, X_test, y_test, y_train_pred,
-              #y_test_pred, show_figure=True, save_figure=True)
